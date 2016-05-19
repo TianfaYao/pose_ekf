@@ -44,10 +44,8 @@ enum SensorType
 
 Pose_ekf pose_ekf;
 ros::Publisher pose_pub;
-ros::Publisher est_path_pub;
 
 nav_msgs::Path path_msg;
-nav_msgs::Path est_path;
 ros::Publisher pub_path;
 
 deque< pair<double, sensor_msgs::Imu> > imu_q;
@@ -56,29 +54,6 @@ deque< pair<double, hector_uav_msgs::Altimeter> >altimeter_q;
 deque< pair<double, sensor_msgs::Range> >sonar_height_q;
 deque< pair<double, Vector3d> >fix_q;
 deque< pair<double, geometry_msgs::Vector3Stamped> >fix_velocity_q;
-
-void pathCallback(const geometry_msgs::PoseStampedConstPtr& msg)
-{
-
-	geometry_msgs::PoseStamped temp;
-	temp.pose.position.x = msg-> pose.position.x;
-	temp.pose.position.y = msg-> pose.position.y;
-	temp.pose.position.z = msg-> pose.position.z;
-
-	cout <<temp.pose.position.x << " " <<temp.pose.position.y << " " <<temp.pose.position.z << endl;
-	temp.pose.orientation.x  = msg-> pose.orientation.x;
-	temp.pose.orientation.y  = msg-> pose.orientation.y;
-	temp.pose.orientation.z  = msg-> pose.orientation.z;
-	temp.pose.orientation.w  = msg-> pose.orientation.w;
-	temp.header.stamp = msg-> header.stamp;
-	temp.header.frame_id = "world";
-	
-	path_msg.poses.push_back(temp);
-	path_msg.header.frame_id = "world";
-	path_msg.header.stamp = msg-> header.stamp;
-	pub_path.publish(path_msg);
-
-}
 
 void publish_pose(Pose_ekf pose_ekf)
 {
@@ -95,15 +70,8 @@ void publish_pose(Pose_ekf pose_ekf)
   pose.pose.position.x = p(0);
   pose.pose.position.y = p(1);
   pose.pose.position.z = p(2);
+
   pose_pub.publish(pose);
-  
-  est_path.poses.push_back(pose);
-  est_path.header.frame_id = "world";
-  est_path.header.stamp = ros::Time(pose_ekf.get_time());
-  est_path_pub.publish(est_path);
-  
-  
-  
 }
 
 
@@ -112,7 +80,7 @@ bool loadModels()
   
   if (!geoid) {
     try {
-      geoid = std::make_shared<GeographicLib::Geoid>("egm84-15", "/home/yebo/yebo/src/pose_ekf/src/geoids");
+      geoid = std::make_shared<GeographicLib::Geoid>("egm84-15", "/home/libing/catkin_ws/src/pose_ekf/src/geoids");
     }
     catch (GeographicLib::GeographicErr &e) {
       ROS_ERROR("Failed to load geoid. Reason: %s", e.what());
@@ -277,11 +245,9 @@ int main (int argc, char **argv)
   ros::init(argc, argv, "pose_estimator");
   ros::NodeHandle n("~");
 
-  pub_path = n.advertise<nav_msgs::Path>("/path", 10);
-  
+  pub_path = n.advertise<nav_msgs::Path>("path", 10);
   pose_pub = n.advertise<geometry_msgs::PoseStamped>("/est_pose", 10);
-  
-  est_path_pub = n.advertise<nav_msgs::Path>("/est_path",10);
+
   path_msg.header.frame_id = "world";
   
   ros::Subscriber sub_imu = n.subscribe("imu", 100, imuCallback);
@@ -290,7 +256,6 @@ int main (int argc, char **argv)
   ros::Subscriber sub_sonar = n.subscribe("sonar_height", 100, sonarCallback); 
   ros::Subscriber sub_fix_velocity = n.subscribe("fix_velocity", 100, fixVelocityCallback);
   ros::Subscriber sub_altimeter = n.subscribe("altimeter", 100, altimeterCallback);
-  ros::Subscriber sub_ground_truth_to_tf_pose = n.subscribe("/ground_truth_to_tf/pose",100, pathCallback);
   
 
   bool ret = loadModels();
